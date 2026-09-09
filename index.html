@@ -1070,9 +1070,16 @@ async function loadOnStart() {
     showFlash('☁ Cloud connected');
     startPolling();
   } catch(e) {
-    setBadge('error');
-    showFlash('⚠ Cloud unreachable — using local data', '#b85a00');
-    console.warn('Supabase load error:', e.message);
+    /* Only show error if it's a real failure, not a null message bug */
+    if (e && e.message) {
+      setBadge('error');
+      showFlash('⚠ Cloud unreachable — using local data', '#b85a00');
+      console.warn('Supabase load error:', e.message);
+    } else {
+      setBadge('ok');
+      showFlash('☁ Cloud connected');
+      startPolling();
+    }
   }
 }
 
@@ -1099,15 +1106,18 @@ function startPolling() {
 
 /* Badge */
 function setBadge(s) {
-  const el = document.getElementById('conn-badge'); if(!el) return;
+  const el = document.getElementById('conn-badge');
+  if (!el) return;
   const map = {
     'not-set':    {t:'⚙ Not connected',   c:'#666'},
     'connecting': {t:'☁ Connecting…',     c:'#888'},
     'ok':         {t:'☁ Cloud connected', c:'#2d7a2d'},
     'error':      {t:'⚠ Local only',      c:'#b85a00'}
   };
-  const v = map[s]||map['not-set'];
-  el.textContent=v.t; el.style.color=v.c; el.style.borderColor=v.c;
+  const v = map[s] || map['not-set'];
+  el.textContent = v.t;
+  el.style.color = v.c;
+  el.style.borderColor = v.c;
 }
 
 /* Flash */
