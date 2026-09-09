@@ -176,8 +176,8 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(
     </div>
     <div class="nav-center" id="dots-0"></div>
     <div class="nav-right">
-      <button class="btn" onclick="openConfig()" style="font-size:10px;padding:4px 10px;">⚙ Cloud Setup</button>
-      <span id="conn-badge" style="font-size:10px;border:1px solid #555;color:#555;padding:3px 10px;border-radius:20px;white-space:nowrap;">⚙ Setup Supabase</span>
+      <button class="btn" onclick="openConfig()" style="font-size:10px;padding:4px 12px;">⚙ Cloud Setup</button>
+      <span id="conn-badge" style="font-size:10px;border:1px solid #555;color:#555;padding:3px 10px;border-radius:20px;white-space:nowrap;">⚙ Not connected</span>
       <span class="nav-label">Sales &amp; Backlog</span>
       <div><div class="clock" id="clk">--:--</div><div class="date-s" id="dstr">--</div></div>
     </div>
@@ -264,7 +264,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(
     </div>
     <div class="nav-center" id="dots-1"></div>
     <div class="nav-right">
-      <button class="btn" onclick="openConfig()" style="font-size:10px;padding:4px 10px;">⚙ Cloud Setup</button>
+      
       <span class="nav-label">Sales &amp; Backlog</span>
       <div><div class="clock" id="clk1">--:--</div><div class="date-s" id="dstr1">--</div></div>
     </div>
@@ -319,7 +319,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(
     </div>
     <div class="nav-center" id="dots-2"></div>
     <div class="nav-right">
-      <button class="btn" onclick="openConfig()" style="font-size:10px;padding:4px 10px;">⚙ Cloud Setup</button>
+      
       <span class="nav-label">Shop Floor</span>
       <div><div class="clock" id="clk2">--:--</div><div class="date-s" id="dstr2">--</div></div>
     </div>
@@ -385,7 +385,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(
     </div>
     <div class="nav-center" id="dots-3"></div>
     <div class="nav-right">
-      <button class="btn" onclick="openConfig()" style="font-size:10px;padding:4px 10px;">⚙ Cloud Setup</button>
+      
       <span class="nav-label">Shop Floor</span>
       <div><div class="clock" id="clk3">--:--</div><div class="date-s" id="dstr3">--</div></div>
     </div>
@@ -445,7 +445,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(
     </div>
     <div class="nav-center" id="dots-4"></div>
     <div class="nav-right">
-      <button class="btn" onclick="openConfig()" style="font-size:10px;padding:4px 10px;">⚙ Cloud Setup</button>
+      
       <span class="nav-label">People</span>
       <div><div class="clock" id="clk4">--:--</div><div class="date-s" id="dstr4">--</div></div>
     </div>
@@ -926,9 +926,8 @@ function buildTickerText() {
   if(s.bl)   parts.push('Backlog: '+s.bl+' (target $2.0M)');
   if(s.ma)   parts.push('Month Actual: '+s.ma+' / Budget: '+(s.mb||'—'));
   if(s.wr)   parts.push('Quote Win Rate: '+s.wr+'%');
-  if(s.jkw)  parts.push('Jobs Kicked Off This Week: '+s.jkw);
-  if(sh.otd) parts.push('On-Time Delivery: '+sh.otd+'%');
-  if(sh.sw)  parts.push('Shipped This Week: '+sh.sw);
+  if(sh.otd) parts.push('Current Month OTD: '+sh.otd);
+  if(sh.sw)  parts.push('Previous Month OTD: '+sh.sw);
   if(!parts.length) parts.push('Total Tooling Concepts — Shop Floor Dashboard');
   return parts.map(p=>'✦  '+p).join('     ')+'  ';
 }
@@ -940,377 +939,256 @@ function updateAllTickers() {
   }
 }
 
-/* ══════════════════════════════════════════════════════
-   SUPABASE + localStorage PERSISTENCE LAYER
-   ── Supabase is the source of truth (shared across
-      all machines / browsers).
-   ── localStorage is a fast local cache so the page
-      loads instantly even before Supabase responds.
-   ── All data lives in ONE row in the `dashboard`
-      table, identified by id = 'ttc-main'.
-   ══════════════════════════════════════════════════════ */
-
-const LS_KEY   = 'ttc_dashboard_v1';
-const LS_CREDS = 'ttc_supabase_creds';
-const ROW_ID   = 'ttc-main';
-
-/* ── Credentials (loaded from localStorage, set via config modal) ── */
-let SB_URL = '';
-let SB_KEY = '';
+/* ══════════════════════════════════════════
+   PERSISTENCE — Supabase + localStorage
+   Supabase = shared across all machines
+   localStorage = instant local cache
+   ══════════════════════════════════════════ */
+const LS_KEY   = 'ttc_v2_data';
+const LS_CREDS = 'ttc_v2_creds';
+let SB_URL = '', SB_KEY = '';
 
 function loadCreds() {
-  try {
-    const c = JSON.parse(localStorage.getItem(LS_CREDS) || '{}');
-    SB_URL = c.url || '';
-    SB_KEY = c.key || '';
-  } catch(e) {}
+  try { const c = JSON.parse(localStorage.getItem(LS_CREDS)||'{}'); SB_URL=c.url||''; SB_KEY=c.key||''; } catch(e){}
 }
-function saveCreds(url, key) {
-  localStorage.setItem(LS_CREDS, JSON.stringify({ url, key }));
-  SB_URL = url; SB_KEY = key;
-}
-function hasSupabase() { return !!(SB_URL && SB_KEY); }
+function hasSB() { return !!(SB_URL && SB_KEY); }
 
-/* ── Supabase REST helpers ── */
-async function sbGet() {
-  const r = await fetch(`${SB_URL}/rest/v1/dashboard?id=eq.${ROW_ID}&select=payload`, {
-    headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` }
-  });
-  if (!r.ok) throw new Error(`Supabase GET ${r.status}`);
-  const rows = await r.json();
-  return rows[0]?.payload || null;
-}
-
-async function sbUpsert(payload) {
-  const r = await fetch(`${SB_URL}/rest/v1/dashboard`, {
-    method: 'POST',
-    headers: {
-      apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`,
-      'Content-Type': 'application/json',
-      Prefer: 'resolution=merge-duplicates'
-    },
-    body: JSON.stringify({ id: ROW_ID, payload })
-  });
-  if (!r.ok) throw new Error(`Supabase UPSERT ${r.status}`);
+/* Supabase fetch wrapper */
+async function sbFetch(method, body) {
+  const url = `${SB_URL}/rest/v1/dashboard?id=eq.ttc-main`;
+  const headers = {
+    'apikey': SB_KEY,
+    'Authorization': 'Bearer ' + SB_KEY,
+    'Content-Type': 'application/json',
+    'Prefer': method==='POST' ? 'resolution=merge-duplicates,return=minimal' : ''
+  };
+  const opts = { method, headers };
+  if (body) opts.body = JSON.stringify(body);
+  const r = await fetch(method==='GET'
+    ? `${SB_URL}/rest/v1/dashboard?id=eq.ttc-main&select=payload`
+    : `${SB_URL}/rest/v1/dashboard`, opts);
+  if (!r.ok) {
+    const txt = await r.text();
+    throw new Error(`${r.status}: ${txt}`);
+  }
+  return method==='GET' ? r.json() : null;
 }
 
-/* ── Supabase real-time polling (display machine stays live) ── */
-let _pollTimer = null;
-function startPolling() {
-  if (_pollTimer) return;
-  _pollTimer = setInterval(async () => {
-    if (!hasSupabase()) return;
-    try {
-      const remote = await sbGet();
-      if (!remote) return;
-      const localRaw = localStorage.getItem(LS_KEY);
-      const local = localRaw ? JSON.parse(localRaw) : null;
-      /* Only re-render if remote is newer */
-      if (!local || remote.ts > (local.ts || 0)) {
-        applyPayload(remote);
-        localStorage.setItem(LS_KEY, JSON.stringify(remote));
-        showFlash('↻ Updated from cloud', '#2a78d6');
-      }
-    } catch(e) { /* silent — display machine keeps showing cached data */ }
-  }, 30000); // poll every 30 seconds
-}
-
-/* ── Serialize all current page data ── */
+/* Build payload from current state + tables */
 function buildPayload() {
   return {
     ts: Date.now(),
-    sales: state.sales,
-    shop:  state.shop,
-    revenue: state.revenue,
-    recognitions: state.recognitions,
-    pipeline: serializePipeline(),
-    due:      serializeDue(),
-    adv:      serializeAdv()
+    sales: state.sales, shop: state.shop,
+    revenue: state.revenue, recognitions: state.recognitions,
+    pipeline: serializePipeline(), adv: serializeAdv()
   };
 }
-
 function serializePipeline() {
   return [...document.querySelectorAll('#pipeline-body tr')].map(tr => {
-    const inp = tr.querySelectorAll('input[type=text]');
-    return { sp: inp[0]?.value||'', pipeline: inp[1]?.value||'', ytd: inp[2]?.value||'',
-             quotes: inp[3]?.value||'', won: inp[4]?.value||'', winpct: inp[5]?.value||'' };
-  });
-}
-function serializeDue() {
-  return [...document.querySelectorAll('#due-body tr')].map(tr => {
-    const inp = tr.querySelectorAll('input[type=text]');
-    const sel = tr.querySelectorAll('select');
-    return { job:inp[0]?.value||'', cust:inp[1]?.value||'', desc:inp[2]?.value||'',
-             due:inp[3]?.value||'', leader:inp[4]?.value||'',
-             status:sel[0]?.value||'', ontime:sel[1]?.value||'' };
+    const i = tr.querySelectorAll('input[type=text]');
+    return {sp:i[0]?.value||'',pipeline:i[1]?.value||'',ytd:i[2]?.value||'',quotes:i[3]?.value||'',won:i[4]?.value||'',winpct:i[5]?.value||''};
   });
 }
 function serializeAdv() {
   return [...document.querySelectorAll('#adv-body tr')].map(tr => {
-    const inp = tr.querySelectorAll('input[type=text]');
-    const sel = tr.querySelector('select');
-    return { job:inp[0]?.value||'', cust:inp[1]?.value||'',
-             custDue:inp[2]?.value||'', targetDue:inp[3]?.value||'',
-             rev:inp[4]?.value||'', leader:sel?.value||'' };
+    const i = tr.querySelectorAll('input[type=text]'); const s = tr.querySelector('select');
+    return {job:i[0]?.value||'',cust:i[1]?.value||'',custDue:i[2]?.value||'',targetDue:i[3]?.value||'',rev:i[4]?.value||'',leader:s?.value||''};
   });
 }
 
-/* ── Apply a payload object to the page ── */
+/* Apply payload to page */
 function applyPayload(d) {
   if (!d) return;
   if (d.sales) Object.assign(state.sales, d.sales);
-  if (d.shop)  Object.assign(state.shop,  d.shop);
-  if (d.revenue?.length === 12) state.revenue = d.revenue;
-  if (d.recognitions?.length)   state.recognitions = d.recognitions;
-
-  /* Pipeline */
+  if (d.shop)  Object.assign(state.shop, d.shop);
+  if (d.revenue?.length===12) state.revenue = d.revenue;
+  if (d.recognitions?.length) state.recognitions = d.recognitions;
   if (d.pipeline?.length) {
-    const tb = document.getElementById('pipeline-body');
-    tb.innerHTML = '';
+    const tb = document.getElementById('pipeline-body'); tb.innerHTML='';
     d.pipeline.forEach(r => {
       const tr = document.createElement('tr');
-      tr.innerHTML = `<td><button class="del-btn" onclick="delRow(this)">×</button></td>
-        <td><input type="text" value="${esc(r.sp)}"></td>
-        <td><input type="text" value="${esc(r.pipeline)}"></td>
-        <td><input type="text" value="${esc(r.ytd)}"></td>
-        <td><input type="text" value="${esc(r.quotes||'')}"></td>
-        <td><input type="text" value="${esc(r.won||'')}"></td>
-        <td><input type="text" value="${esc(r.winpct||'')}"></td>`;
+      tr.innerHTML=`<td><button class="del-btn" onclick="delRow(this)">×</button></td>
+        <td><input type="text" value="${esc(r.sp)}"></td><td><input type="text" value="${esc(r.pipeline)}"></td>
+        <td><input type="text" value="${esc(r.ytd)}"></td><td><input type="text" value="${esc(r.quotes||'')}"></td>
+        <td><input type="text" value="${esc(r.won||'')}"></td><td><input type="text" value="${esc(r.winpct||'')}"></td>`;
       tb.appendChild(tr);
     });
   }
-  /* Due-this-week */
-  if (d.due?.length) {
-    const tb = document.getElementById('due-body');
-    tb.innerHTML = '';
-    d.due.forEach(r => {
-      const tr = document.createElement('tr');
-      const sOpts = ['100%-Ready to Ship','SHIPPED','80%-Manufacture complete',
-        '60%-Ready for CMM lab','40%-CNC completed/Assembly','20%-Details at CNC']
-        .map(o=>`<option${r.status===o?' selected':''}>${o}</option>`).join('');
-      const otOpts = ['On track','At risk','Past due','Done']
-        .map(o=>`<option${r.ontime===o?' selected':''}>${o}</option>`).join('');
-      tr.innerHTML = `<td><button class="del-btn" onclick="delRow(this)">×</button></td>
-        <td><input type="text" value="${esc(r.job)}"></td>
-        <td><input type="text" value="${esc(r.cust)}"></td>
-        <td><input type="text" value="${esc(r.desc)}"></td>
-        <td><input type="text" value="${esc(r.due)}"></td>
-        <td><input type="text" value="${esc(r.leader)}"></td>
-        <td><select>${sOpts}</select></td>
-        <td><select>${otOpts}</select></td>`;
-      tb.appendChild(tr);
-    });
-  }
-  /* Advance */
   if (d.adv?.length) {
-    const tb = document.getElementById('adv-body');
-    tb.innerHTML = '';
-    const ldrs = ['','Scott Higbee','John Grewe','Quinton Baranowski','Dave Wieten',
-      'Mike Modzeleski','Ken Beutler','Patrick Dunnenback','Jordan Meadows','Greg Markley',
-      'Todd Gurnsey','Kevin Nowicki','Dave Richmond','TBD','CNC','LAB'];
+    const tb = document.getElementById('adv-body'); tb.innerHTML='';
+    const ldrs=['','Scott Higbee','John Grewe','Quinton Baranowski','Dave Wieten','Mike Modzeleski','Ken Beutler','Patrick Dunnenback','Jordan Meadows','Greg Markley','Todd Gurnsey','Kevin Nowicki','Dave Richmond','TBD','CNC','LAB'];
     d.adv.forEach(r => {
       const tr = document.createElement('tr');
       const opts = ldrs.map(l=>`<option value="${l}"${r.leader===l?' selected':''}>${l||'— select —'}</option>`).join('');
-      tr.innerHTML = `<td><button class="del-btn" onclick="delRow(this)">×</button></td>
-        <td><input type="text" value="${esc(r.job)}"></td>
-        <td><input type="text" value="${esc(r.cust)}"></td>
-        <td><input type="text" value="${esc(r.custDue)}"></td>
-        <td><input type="text" value="${esc(r.targetDue)}"></td>
-        <td><input type="text" value="${esc(r.rev)}"></td>
-        <td><select>${opts}</select></td>`;
+      tr.innerHTML=`<td><button class="del-btn" onclick="delRow(this)">×</button></td>
+        <td><input type="text" value="${esc(r.job)}"></td><td><input type="text" value="${esc(r.cust)}"></td>
+        <td><input type="text" value="${esc(r.custDue)}"></td><td><input type="text" value="${esc(r.targetDue)}"></td>
+        <td><input type="text" value="${esc(r.rev)}"></td><td><select>${opts}</select></td>`;
       tb.appendChild(tr);
     });
   }
   renderSales(); renderShop(); renderRecCards(); updateAllTickers();
-  if (revChart) {
-    revChart.data.datasets[0].data = state.revenue.map(v=>v||null);
-    revChart.update();
-  }
+  if (revChart) { revChart.data.datasets[0].data=state.revenue.map(v=>v||null); revChart.update(); }
 }
 
-/* ── SAVE: write to localStorage first (instant), then Supabase ── */
+/* Save — localStorage immediately, then Supabase */
 async function saveToStorage() {
   const payload = buildPayload();
-  /* 1. Always write localStorage immediately */
-  try { localStorage.setItem(LS_KEY, JSON.stringify(payload)); } catch(e) {}
-  showFlash('✓ Saved locally', '#2d7a2d');
-  /* 2. Then push to Supabase if configured */
-  if (hasSupabase()) {
-    try {
-      await sbUpsert(payload);
-      showFlash('✓ Synced to cloud ☁', '#2d7a2d');
-    } catch(e) {
-      showFlash('⚠ Cloud sync failed — saved locally', '#b85a00');
-      console.warn('Supabase save error:', e);
-    }
+  try { localStorage.setItem(LS_KEY, JSON.stringify(payload)); } catch(e){}
+  if (!hasSB()) { showFlash('✓ Saved locally'); return; }
+  try {
+    await sbFetch('POST', {id:'ttc-main', payload});
+    showFlash('☁ Saved to cloud');
+  } catch(e) {
+    showFlash('⚠ Cloud save failed — data saved locally', '#b85a00');
+    console.warn('Supabase save error:', e.message);
   }
 }
 
-/* ── LOAD on startup ── */
+/* Load on startup */
 async function loadOnStart() {
-  /* Step 1: load localStorage instantly so page feels fast */
-  let hadLocal = false;
+  /* Always load localStorage first for instant display */
   try {
     const raw = localStorage.getItem(LS_KEY);
-    if (raw) { applyPayload(JSON.parse(raw)); hadLocal = true; }
-  } catch(e) {}
+    if (raw) applyPayload(JSON.parse(raw));
+  } catch(e){}
 
-  /* Step 2: if Supabase configured, fetch remote and prefer it if newer */
-  if (hasSupabase()) {
-    setConnectionBadge('connecting');
-    try {
-      const remote = await sbGet();
-      if (remote) {
-        const localRaw = localStorage.getItem(LS_KEY);
-        const local = localRaw ? JSON.parse(localRaw) : null;
-        if (!local || remote.ts >= (local.ts || 0)) {
-          applyPayload(remote);
-          localStorage.setItem(LS_KEY, JSON.stringify(remote));
-        }
-        setConnectionBadge('connected');
-        showFlash('✓ Loaded from cloud ☁', '#2d7a2d');
-      } else {
-        setConnectionBadge('connected');
+  if (!hasSB()) { setBadge('not-set'); return; }
+  setBadge('connecting');
+  try {
+    const rows = await sbFetch('GET');
+    const remote = rows?.[0]?.payload || null;
+    if (remote) {
+      const localRaw = localStorage.getItem(LS_KEY);
+      const local = localRaw ? JSON.parse(localRaw) : null;
+      if (!local || remote.ts > (local.ts||0)) {
+        applyPayload(remote);
+        localStorage.setItem(LS_KEY, JSON.stringify(remote));
       }
-    } catch(e) {
-      setConnectionBadge('offline');
-      showFlash('⚠ Supabase unreachable — showing local data', '#b85a00');
     }
+    setBadge('ok');
+    showFlash('☁ Cloud connected');
     startPolling();
-  } else {
-    setConnectionBadge('not-configured');
-    if (hadLocal) showFlash('✓ Data restored (local)', '#2d7a2d');
+  } catch(e) {
+    setBadge('error');
+    showFlash('⚠ Cloud unreachable — using local data', '#b85a00');
+    console.warn('Supabase load error:', e.message);
   }
 }
 
-/* ── Connection status badge ── */
-function setConnectionBadge(status) {
-  const badge = document.getElementById('conn-badge');
-  if (!badge) return;
-  const map = {
-    'connecting':     { text:'☁ Connecting…',      color:'#555' },
-    'connected':      { text:'☁ Cloud connected',   color:'#2d7a2d' },
-    'offline':        { text:'⚡ Local only',        color:'#b85a00' },
-    'not-configured': { text:'⚙ Setup Supabase',    color:'#555' }
-  };
-  const s = map[status] || map['not-configured'];
-  badge.textContent = s.text;
-  badge.style.color = s.color;
-  badge.style.borderColor = s.color;
+/* Poll every 30s on display machine */
+let _poll = null;
+function startPolling() {
+  if (_poll) return;
+  _poll = setInterval(async () => {
+    if (!hasSB()) return;
+    try {
+      const rows = await sbFetch('GET');
+      const remote = rows?.[0]?.payload || null;
+      if (!remote) return;
+      const local = localStorage.getItem(LS_KEY);
+      const localTs = local ? JSON.parse(local).ts||0 : 0;
+      if (remote.ts > localTs) {
+        applyPayload(remote);
+        localStorage.setItem(LS_KEY, JSON.stringify(remote));
+        showFlash('↻ Updated from cloud');
+      }
+    } catch(e) {}
+  }, 30000);
 }
 
-/* ── Flash message ── */
-function showFlash(msg, color) {
-  let el = document.getElementById('save-flash');
+/* Badge */
+function setBadge(s) {
+  const el = document.getElementById('conn-badge'); if(!el) return;
+  const map = {
+    'not-set':    {t:'⚙ Not connected',   c:'#666'},
+    'connecting': {t:'☁ Connecting…',     c:'#888'},
+    'ok':         {t:'☁ Cloud connected', c:'#2d7a2d'},
+    'error':      {t:'⚠ Local only',      c:'#b85a00'}
+  };
+  const v = map[s]||map['not-set'];
+  el.textContent=v.t; el.style.color=v.c; el.style.borderColor=v.c;
+}
+
+/* Flash */
+function showFlash(msg, bg) {
+  let el = document.getElementById('sf');
   if (!el) {
-    el = document.createElement('div');
-    el.id = 'save-flash';
-    el.style.cssText = 'position:fixed;bottom:52px;left:16px;font-size:11px;'
-      +'padding:5px 14px;border-radius:20px;z-index:60;opacity:0;'
-      +'transition:opacity .3s;pointer-events:none;color:#fff;';
+    el=document.createElement('div'); el.id='sf';
+    el.style.cssText='position:fixed;bottom:52px;left:16px;font-size:11px;font-weight:600;padding:6px 16px;border-radius:20px;z-index:60;opacity:0;transition:opacity .3s;pointer-events:none;color:#fff;';
     document.body.appendChild(el);
   }
-  el.textContent = msg;
-  el.style.background = color || '#2d7a2d';
-  el.style.opacity = '1';
-  clearTimeout(el._t);
-  el._t = setTimeout(() => el.style.opacity = '0', 2200);
+  el.textContent=msg; el.style.background=bg||'#2d7a2d'; el.style.opacity='1';
+  clearTimeout(el._t); el._t=setTimeout(()=>el.style.opacity='0', 2500);
 }
 
-/* ── HTML escape ── */
+/* HTML escape */
 function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
 
-/* ── Auto-save on table edits ── */
+/* Auto-save on table edits */
 function wireTableSave(id) {
-  const tb = document.getElementById(id);
-  if (!tb) return;
-  tb.addEventListener('input',  () => debounceSave());
-  tb.addEventListener('change', () => debounceSave());
+  const tb=document.getElementById(id); if(!tb) return;
+  tb.addEventListener('input', ()=>debounceSave());
+  tb.addEventListener('change',()=>debounceSave());
 }
-let _saveTimer = null;
-function debounceSave() {
-  clearTimeout(_saveTimer);
-  _saveTimer = setTimeout(saveToStorage, 700);
-}
+let _st=null;
+function debounceSave(){ clearTimeout(_st); _st=setTimeout(saveToStorage,700); }
 
-/* ── Patch modal saves ── */
-const _origSaveSales   = saveSales;   saveSales   = function(){ _origSaveSales();   saveToStorage(); };
-const _origSaveShop    = saveShop;    saveShop    = function(){ _origSaveShop();    saveToStorage(); };
-const _origSaveRevenue = saveRevenue; saveRevenue = function(){ _origSaveRevenue(); saveToStorage(); };
-const _origSaveRec     = saveRec;     saveRec     = function(){ _origSaveRec();     saveToStorage(); };
+/* Patch modal saves */
+const _oSS=saveSales; saveSales=function(){_oSS(); saveToStorage();};
+const _oSh=saveShop;  saveShop =function(){_oSh(); saveToStorage();};
+const _oSR=saveRevenue; saveRevenue=function(){_oSR(); saveToStorage();};
+const _oRc=saveRec;   saveRec  =function(){_oRc(); saveToStorage();};
 
-/* ── Config modal logic ── */
+/* Config modal */
 function openConfig() {
   loadCreds();
-  document.getElementById('cfg-url').value = SB_URL;
-  document.getElementById('cfg-key').value = SB_KEY;
+  document.getElementById('cfg-url').value=SB_URL;
+  document.getElementById('cfg-key').value=SB_KEY;
   openModal('mconfig');
 }
 function saveConfig() {
-  const url = document.getElementById('cfg-url').value.trim().replace(/\/$/, '');
-  const key = document.getElementById('cfg-key').value.trim();
-  if (!url || !key) { alert('Both fields required.'); return; }
-  saveCreds(url, key);
+  const url=document.getElementById('cfg-url').value.trim().replace(/\/$/,'');
+  const key=document.getElementById('cfg-key').value.trim();
+  if (!url||!key) { alert('Both fields are required.'); return; }
+  localStorage.setItem(LS_CREDS, JSON.stringify({url,key}));
+  SB_URL=url; SB_KEY=key;
   closeModal('mconfig');
-  showFlash('✓ Credentials saved — reloading…', '#2d7a2d');
-  setTimeout(() => location.reload(), 900);
+  showFlash('✓ Credentials saved — connecting…');
+  setBadge('connecting');
+  loadOnStart();
 }
 
-/* ── Reset utility ── */
-window.clearDashboard = function() {
-  if (confirm('Clear ALL saved dashboard data and reset to defaults?')) {
-    localStorage.removeItem(LS_KEY);
-    location.reload();
-  }
-};
-
-/* ── INIT ── */
+/* INIT */
 loadCreds();
 buildRevChart();
 updateAllTickers();
 wireTableSave('pipeline-body');
-wireTableSave('due-body');
 wireTableSave('adv-body');
 startProgress();
-loadOnStart(); /* async — fetches Supabase in background */
+loadOnStart();
 </script>
 
-<!-- ══ SUPABASE CONFIG MODAL ══ -->
+<!-- CLOUD SETUP MODAL -->
 <div class="mover" id="mconfig">
-  <div class="modal" style="width:500px;">
-    <div class="mt">☁ Supabase Connection Setup</div>
-    <p style="font-size:12px;color:var(--muted);margin-bottom:20px;line-height:1.6;">
-      Paste your Supabase project URL and anon key below. These are saved to this
-      browser only — you'll need to enter them once on each machine.
-      See the setup guide below if you haven't created the table yet.
+  <div class="modal" style="width:520px;">
+    <div class="mt">☁ Cloud Setup — Supabase</div>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:18px;line-height:1.7;">
+      Enter your Supabase credentials below. These are saved in this browser only —
+      paste them once on each machine you use. Data then syncs automatically between all machines.
     </p>
     <div class="mf">
-      <label class="ml">Project URL <span style="color:#555;">(e.g. https://xyzxyz.supabase.co)</span></label>
+      <label class="ml">Project URL</label>
       <input class="mi" id="cfg-url" placeholder="https://xxxxxxxxxxxx.supabase.co">
     </div>
     <div class="mf">
-      <label class="ml">Anon / Public Key</label>
+      <label class="ml">Anon / Public key</label>
       <input class="mi" id="cfg-key" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...">
     </div>
-    <details style="margin-top:16px;border:1px solid #2a2a2a;border-radius:6px;padding:10px 14px;">
-      <summary style="font-size:11px;color:var(--muted);cursor:pointer;font-weight:600;text-transform:uppercase;letter-spacing:.06em;">
-        One-time Supabase table setup (click to expand)
-      </summary>
-      <div style="margin-top:12px;font-size:12px;color:#aaa;line-height:1.7;">
-        <b style="color:#f0efec;">Step 1</b> — Go to <a href="https://supabase.com" target="_blank" style="color:#4dd4a0;">supabase.com</a> and create a free account + new project.<br>
-        <b style="color:#f0efec;">Step 2</b> — In your project, open <b>SQL Editor</b> and run:<br>
-        <pre style="background:#111;border-radius:5px;padding:10px;margin:8px 0;font-size:11px;overflow-x:auto;color:#4dd4a0;">CREATE TABLE dashboard (
-  id   text PRIMARY KEY,
-  payload jsonb
-);</pre>
-        <b style="color:#f0efec;">Step 3</b> — Go to <b>Settings → API</b> and copy your<br>
-        &nbsp;&nbsp;• <b>Project URL</b> (top of the page)<br>
-        &nbsp;&nbsp;• <b>anon / public</b> key (under Project API keys)<br>
-        <b style="color:#f0efec;">Step 4</b> — Paste them above and click Save.<br>
-        <b style="color:#f0efec;">Step 5</b> — Repeat on the display machine — same URL and key.<br>
-        <span style="color:#666;">That's it. Free tier handles this workload easily.</span>
-      </div>
-    </details>
+    <p style="font-size:11px;color:#555;margin-top:4px;">
+      Your URL: <strong style="color:#4dd4a0;">https://vlfetfzjxncytrppnwix.supabase.co</strong><br>
+      Your key is the <strong>anon / public</strong> key from Supabase → Settings → API Keys.
+    </p>
     <div class="mfoot">
       <button class="btn" onclick="closeModal('mconfig')">Cancel</button>
       <button class="btn btng" onclick="saveConfig()">Save &amp; connect</button>
@@ -1320,4 +1198,3 @@ loadOnStart(); /* async — fetches Supabase in background */
 
 </body>
 </html>
-
