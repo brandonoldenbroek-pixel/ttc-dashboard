@@ -1,1 +1,938 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TTC Shop Floor Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+:root{
+  --g:#2d7a2d;--good:#1baf7a;--warn:#eda100;--danger:#d03b3b;--blue:#2a78d6;
+  --card:#1e1e1e;--border:#2e2e2e;--bg:#111;--text:#f0efec;--muted:#777;--sub:#bbb;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(--text);
+  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}
+.slide{position:absolute;inset:0;display:flex;flex-direction:column;
+  opacity:0;pointer-events:none;transition:opacity .6s ease;}
+.slide.active{opacity:1;pointer-events:all;}
+.nav{background:#0a0a0a;border-bottom:2px solid var(--g);
+  padding:0 24px;display:flex;align-items:center;justify-content:space-between;
+  height:62px;flex-shrink:0;}
+.logo-box{background:#fff;border-radius:7px;padding:4px 10px;height:46px;
+  display:flex;align-items:center;box-shadow:0 2px 8px rgba(0,0,0,.4);}
+.logo-box img{height:38px;width:auto;display:block;}
+.nav-brand{font-size:15px;font-weight:700;margin-left:14px;}
+.nav-subtitle{font-size:10px;color:#555;text-transform:uppercase;letter-spacing:.08em;margin-left:14px;}
+.nav-center{display:flex;align-items:center;gap:6px;}
+.slide-dot{width:8px;height:8px;border-radius:50%;background:#333;cursor:pointer;transition:all .2s;}
+.slide-dot.active{background:var(--g);transform:scale(1.3);}
+.nav-right{display:flex;align-items:center;gap:12px;}
+.nav-label{font-size:12px;font-weight:600;color:var(--g);text-transform:uppercase;letter-spacing:.08em;}
+.clock{font-size:18px;font-weight:700;font-variant-numeric:tabular-nums;}
+.date-s{font-size:10px;color:var(--muted);text-align:right;}
+.sync-badge{font-size:10px;border:1px solid #444;color:#666;padding:3px 10px;border-radius:20px;white-space:nowrap;}
+.sync-badge.ok{border-color:var(--g);color:#4dd4a0;}
+.sync-badge.err{border-color:var(--warn);color:var(--warn);}
+.autoplay-bar{height:3px;background:#1a1a1a;flex-shrink:0;position:relative;overflow:hidden;}
+.autoplay-fill{position:absolute;left:0;top:0;height:100%;background:var(--g);width:0%;transition:none;}
+.content{flex:1;padding:18px 24px;overflow:hidden;display:flex;flex-direction:column;gap:14px;}
+.cbar{background:#0d2e0d;border:1px solid rgba(45,122,45,.35);border-radius:7px;
+  padding:7px 14px;display:flex;align-items:center;justify-content:space-between;
+  font-size:11px;color:#5a9a5a;flex-shrink:0;}
+.cdot{width:6px;height:6px;border-radius:50%;background:var(--g);margin-right:8px;}
+.btn{padding:5px 12px;border-radius:5px;font-size:11px;font-weight:500;cursor:pointer;
+  border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.07);color:var(--text);transition:all .15s;}
+.btn:hover{background:rgba(255,255,255,.14);}
+.btng{background:var(--g);border-color:var(--g);color:#fff;}
+.btng:hover{background:#3a9a3a;}
+.brow{display:flex;gap:7px;}
+.g4{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;}
+.g2{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;}
+.g21{display:grid;grid-template-columns:2fr 1fr;gap:14px;}
+.grow{flex:1;min-height:0;}
+.card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:16px 18px;}
+.ch{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;
+  color:var(--muted);margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;}
+.kv{font-size:clamp(28px,3.5vw,52px);font-weight:800;line-height:1;margin-bottom:4px;font-variant-numeric:tabular-nums;}
+.kl{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;}
+.kd{font-size:12px;margin-top:6px;color:var(--muted);}
+.kd.up{color:#4dd4a0;}.kd.dn{color:#e86b6b;}
+.pbar{margin:8px 0;}
+.plabel{display:flex;justify-content:space-between;font-size:11px;margin-bottom:5px;color:var(--sub);}
+.ptrack{height:8px;background:#2a2a2a;border-radius:4px;overflow:hidden;}
+.pfill{height:100%;border-radius:4px;transition:width .5s;}
+.sl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.09em;
+  color:var(--g);margin-bottom:8px;border-left:3px solid var(--g);padding-left:7px;}
+.b{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:700;
+  padding:2px 8px;border-radius:20px;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap;}
+.bg{background:rgba(27,175,122,.15);color:#4dd4a0;}
+.etable-wrap{overflow:auto;flex:1;}
+.etable{width:100%;border-collapse:collapse;font-size:13px;}
+.etable th{text-align:left;font-size:9px;font-weight:700;text-transform:uppercase;
+  letter-spacing:.07em;color:#444;padding:6px 8px;border-bottom:1px solid #252525;white-space:nowrap;}
+.etable td{padding:7px 8px;border-bottom:1px solid #1e1e1e;vertical-align:middle;}
+.etable tr:last-child td{border-bottom:none;}
+.etable tr:hover td{background:rgba(255,255,255,.02);}
+.etable input[type=text]{background:transparent;border:none;border-bottom:1px solid #2a2a2a;
+  color:var(--text);font-size:13px;padding:2px 4px;width:100%;outline:none;font-family:inherit;}
+.etable input[type=text]:focus{border-bottom-color:var(--g);background:rgba(45,122,45,.07);}
+.etable select{background:#181818;border:1px solid #2e2e2e;border-radius:3px;
+  color:var(--text);font-size:12px;padding:2px 4px;outline:none;}
+.add-row{font-size:11px;color:var(--g);cursor:pointer;background:none;border:none;
+  padding:5px 0;display:inline-flex;align-items:center;gap:4px;}
+.del-btn{background:none;border:none;color:#444;cursor:pointer;font-size:14px;padding:0 4px;line-height:1;}
+.del-btn:hover{color:#e86b6b;}
+.rec{background:#152715;border:1px solid rgba(45,122,45,.3);border-radius:10px;
+  padding:20px 14px;text-align:center;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;flex:1;}
+.rec-icon{font-size:clamp(30px,4vw,52px);margin-bottom:10px;}
+.rec-name{font-size:clamp(14px,1.6vw,20px);font-weight:700;}
+.rec-sub{font-size:clamp(11px,1.1vw,14px);color:var(--muted);margin-top:4px;}
+.rec-add{background:#0d0d0d;border:1px dashed #333;border-radius:10px;padding:20px 14px;
+  text-align:center;cursor:pointer;flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;}
+.cw{position:relative;flex:1;min-height:0;}
+.ticker{background:var(--g);padding:5px 0;font-size:12px;font-weight:600;overflow:hidden;white-space:nowrap;flex-shrink:0;}
+.ticker-inner{display:inline-block;animation:tick 45s linear infinite;}
+@keyframes tick{0%{transform:translateX(100vw);}100%{transform:translateX(-100%);}}
+.mover{position:fixed;inset:0;background:rgba(0,0,0,.75);display:none;align-items:center;justify-content:center;z-index:999;}
+.mover.open{display:flex;}
+.modal{background:#1a1a1a;border:1px solid #3a3a3a;border-radius:12px;padding:28px;width:540px;max-width:96vw;max-height:92vh;overflow-y:auto;}
+.mt{font-size:15px;font-weight:700;margin-bottom:20px;}
+.mf{margin-bottom:14px;}
+.ml{font-size:11px;color:var(--muted);margin-bottom:5px;display:block;}
+.mi{width:100%;background:#222;border:1px solid #3a3a3a;border-radius:5px;color:var(--text);font-size:13px;padding:8px 10px;outline:none;font-family:inherit;}
+.mi:focus{border-color:var(--g);}
+.mfoot{display:flex;gap:10px;justify-content:flex-end;margin-top:22px;}
+.mgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+#pause-ind{position:fixed;bottom:52px;right:16px;background:rgba(0,0,0,.6);color:#666;
+  font-size:11px;padding:4px 10px;border-radius:20px;pointer-events:none;opacity:0;transition:opacity .3s;z-index:50;}
+#pause-ind.show{opacity:1;}
+#flash{position:fixed;bottom:52px;left:16px;font-size:11px;font-weight:600;padding:6px 16px;
+  border-radius:20px;z-index:60;opacity:0;transition:opacity .3s;pointer-events:none;color:#fff;background:var(--g);}
+#flash.show{opacity:1;}
+</style>
+</head>
+<body>
+
+<!-- SLIDE 1: SALES KPIs + REVENUE CHART -->
+<div class="slide active" id="slide-0">
+  <div class="nav">
+    <div style="display:flex;align-items:center;">
+      <div class="logo-box"><img id="logo-img" src="" alt="TTC"></div>
+      <span class="nav-brand">Total Tooling Concepts</span>
+      <span class="nav-subtitle">Shop Floor Dashboard</span>
+    </div>
+    <div class="nav-center" id="dots-0"></div>
+    <div class="nav-right">
+      <span class="sync-badge" id="sync-badge">⚙ Setup</span>
+      <button class="btn" onclick="openModal('msetup')" style="font-size:10px;">⚙ Setup</button>
+      <span class="nav-label">Sales &amp; Backlog</span>
+      <div><div class="clock" id="clk0">--:--</div><div class="date-s" id="ds0">--</div></div>
+    </div>
+  </div>
+  <div class="autoplay-bar"><div class="autoplay-fill" id="ap-0"></div></div>
+  <div class="content">
+    <div class="cbar">
+      <div style="display:flex;align-items:center;"><div class="cdot"></div>Sales &amp; Backlog — 1 of 2</div>
+      <div class="brow">
+        <button class="btn btng" onclick="openModal('msales')">Edit KPIs</button>
+        <button class="btn" onclick="pushToSheet()">☁ Save to cloud</button>
+        <button class="btn" onclick="togglePause()">⏸ Pause</button>
+      </div>
+    </div>
+    <div class="g4" style="flex-shrink:0;">
+      <div class="card">
+        <div class="ch">Monthly sales vs budget</div>
+        <div class="kv" style="color:#4dd4a0" id="d-ma">$—</div>
+        <div class="kl">Actual this month</div>
+        <div class="kd">Budget: <span id="d-mb">$—</span></div>
+      </div>
+      <div class="card">
+        <div class="ch">Backlog value</div>
+        <div class="kv" style="color:#6aabf7" id="d-bl">$—</div>
+        <div class="kl">Current</div>
+        <div class="kd">Target: $2.0M</div>
+      </div>
+      <div class="card">
+        <div class="ch">YTD revenue</div>
+        <div class="kv" id="d-ytd">$—</div>
+        <div class="kl">Jan – present</div>
+        <div class="kd dn" id="d-ytdvs">↓ 8% YoY</div>
+      </div>
+      <div class="card">
+        <div class="ch">Quote win rate</div>
+        <div class="kv" style="color:#f0b429" id="d-wr">—%</div>
+        <div class="kl">Year to date</div>
+        <div class="kd">Quotes sent: <span id="d-qs">—</span></div>
+      </div>
+    </div>
+    <div class="g21 grow" style="margin-bottom:0;">
+      <div class="card grow" style="display:flex;flex-direction:column;">
+        <div class="ch">Monthly revenue trend — 2026 ($K)
+          <button class="btn" style="font-size:10px;padding:3px 9px" onclick="openRevenueModal()">Edit</button>
+        </div>
+        <div class="cw"><canvas id="revChart"></canvas></div>
+        <div style="display:flex;gap:16px;margin-top:8px;font-size:11px;color:var(--muted);flex-shrink:0;">
+          <span><span style="display:inline-block;width:10px;height:10px;background:#2d7a2d;border-radius:2px;margin-right:4px;"></span>Actual</span>
+          <span><span style="display:inline-block;width:10px;height:3px;background:#6aabf7;margin-right:4px;vertical-align:middle;"></span>Budget ($740K/mo)</span>
+        </div>
+      </div>
+      <div class="card grow" style="display:flex;flex-direction:column;justify-content:center;">
+        <div class="ch">Backlog % of target <span class="b bg" id="d-blpct-badge">—%</span></div>
+        <div class="pbar" style="margin-bottom:24px;">
+          <div class="plabel"><span>Current backlog</span><span id="d-blpct">—</span></div>
+          <div class="ptrack" style="height:14px;"><div class="pfill" id="bl-fill" style="width:0%;background:var(--good);"></div></div>
+        </div>
+        <div style="text-align:center;padding:16px 0;">
+          <div style="font-size:clamp(40px,5.5vw,80px);font-weight:800;color:#6aabf7;line-height:1;font-variant-numeric:tabular-nums;" id="d-bl-big">$—</div>
+          <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-top:8px;">Current backlog value</div>
+          <div style="font-size:12px;color:#555;margin-top:4px;">Target: $2.0M</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="ticker"><span class="ticker-inner" id="tk-0">Total Tooling Concepts — Shop Floor Dashboard</span></div>
+</div>
+
+<!-- SLIDE 2: PIPELINE PER SALESPERSON -->
+<div class="slide" id="slide-1">
+  <div class="nav">
+    <div style="display:flex;align-items:center;">
+      <div class="logo-box"><img id="logo-img-1" src="" alt="TTC"></div>
+      <span class="nav-brand">Total Tooling Concepts</span>
+      <span class="nav-subtitle">Shop Floor Dashboard</span>
+    </div>
+    <div class="nav-center" id="dots-1"></div>
+    <div class="nav-right">
+      <button class="btn" onclick="openModal('msetup')" style="font-size:10px;">⚙ Setup</button>
+      <span class="nav-label">Sales &amp; Backlog</span>
+      <div><div class="clock" id="clk1">--:--</div><div class="date-s" id="ds1">--</div></div>
+    </div>
+  </div>
+  <div class="autoplay-bar"><div class="autoplay-fill" id="ap-1"></div></div>
+  <div class="content">
+    <div class="cbar">
+      <div style="display:flex;align-items:center;"><div class="cdot"></div>Sales &amp; Backlog — 2 of 2</div>
+      <div class="brow">
+        <button class="add-row" onclick="addPipelineRow()">+ add row</button>
+        <button class="btn" onclick="pushToSheet()">☁ Save to cloud</button>
+        <button class="btn" onclick="togglePause()">⏸ Pause</button>
+      </div>
+    </div>
+    <div class="card grow" style="display:flex;flex-direction:column;">
+      <div class="ch">Pipeline per salesperson</div>
+      <div class="etable-wrap">
+        <table class="etable" id="pipeline-tbl">
+          <thead><tr>
+            <th style="width:22px;"></th>
+            <th style="width:18%;">Salesperson</th>
+            <th style="width:20%;">Total Pipeline Value</th>
+            <th style="width:16%;">Sales YTD</th>
+            <th style="width:15%;">Total Quotes</th>
+            <th style="width:15%;">Quotes Won</th>
+            <th style="width:16%;">Win %</th>
+          </tr></thead>
+          <tbody id="pipeline-body">
+            <tr><td><button class="del-btn" onclick="delRow(this)">×</button></td><td><input type="text" value="Brian G."></td><td><input type="text" placeholder="$0"></td><td><input type="text" placeholder="$0"></td><td><input type="text" placeholder="0"></td><td><input type="text" placeholder="0"></td><td><input type="text" placeholder="0%"></td></tr>
+            <tr><td><button class="del-btn" onclick="delRow(this)">×</button></td><td><input type="text" value="Chris G."></td><td><input type="text" placeholder="$0"></td><td><input type="text" placeholder="$0"></td><td><input type="text" placeholder="0"></td><td><input type="text" placeholder="0"></td><td><input type="text" placeholder="0%"></td></tr>
+            <tr><td><button class="del-btn" onclick="delRow(this)">×</button></td><td><input type="text" value="Eric C."></td><td><input type="text" placeholder="$0"></td><td><input type="text" placeholder="$0"></td><td><input type="text" placeholder="0"></td><td><input type="text" placeholder="0"></td><td><input type="text" placeholder="0%"></td></tr>
+            <tr><td><button class="del-btn" onclick="delRow(this)">×</button></td><td><input type="text" value="Josh H."></td><td><input type="text" placeholder="$0"></td><td><input type="text" placeholder="$0"></td><td><input type="text" placeholder="0"></td><td><input type="text" placeholder="0"></td><td><input type="text" placeholder="0%"></td></tr>
+            <tr><td><button class="del-btn" onclick="delRow(this)">×</button></td><td><input type="text" value="Hunter V."></td><td><input type="text" placeholder="$0"></td><td><input type="text" placeholder="$0"></td><td><input type="text" placeholder="0"></td><td><input type="text" placeholder="0"></td><td><input type="text" placeholder="0%"></td></tr>
+            <tr><td><button class="del-btn" onclick="delRow(this)">×</button></td><td><input type="text" value="Dan F."></td><td><input type="text" placeholder="$0"></td><td><input type="text" placeholder="$0"></td><td><input type="text" placeholder="0"></td><td><input type="text" placeholder="0"></td><td><input type="text" placeholder="0%"></td></tr>
+            <tr><td><button class="del-btn" onclick="delRow(this)">×</button></td><td><input type="text" value="Jeff C."></td><td><input type="text" placeholder="$0"></td><td><input type="text" placeholder="$0"></td><td><input type="text" placeholder="0"></td><td><input type="text" placeholder="0"></td><td><input type="text" placeholder="0%"></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="ticker"><span class="ticker-inner" id="tk-1">Total Tooling Concepts — Shop Floor Dashboard</span></div>
+</div>
+
+<!-- SLIDE 3: OTD -->
+<div class="slide" id="slide-2">
+  <div class="nav">
+    <div style="display:flex;align-items:center;">
+      <div class="logo-box"><img id="logo-img-2" src="" alt="TTC"></div>
+      <span class="nav-brand">Total Tooling Concepts</span>
+      <span class="nav-subtitle">Shop Floor Dashboard</span>
+    </div>
+    <div class="nav-center" id="dots-2"></div>
+    <div class="nav-right">
+      <button class="btn" onclick="openModal('msetup')" style="font-size:10px;">⚙ Setup</button>
+      <span class="nav-label">Shop Floor</span>
+      <div><div class="clock" id="clk2">--:--</div><div class="date-s" id="ds2">--</div></div>
+    </div>
+  </div>
+  <div class="autoplay-bar"><div class="autoplay-fill" id="ap-2"></div></div>
+  <div class="content">
+    <div class="cbar">
+      <div style="display:flex;align-items:center;"><div class="cdot"></div>Shop Floor — 1 of 2</div>
+      <div class="brow">
+        <button class="btn btng" onclick="openModal('mshop')">Edit stats</button>
+        <button class="btn" onclick="pushToSheet()">☁ Save to cloud</button>
+        <button class="btn" onclick="togglePause()">⏸ Pause</button>
+      </div>
+    </div>
+    <div class="g2 grow" style="margin-bottom:0;">
+      <div class="card grow" style="display:flex;flex-direction:column;justify-content:center;padding:32px 36px;">
+        <div class="ch" style="font-size:12px;">Current month OTD</div>
+        <div class="kv" style="color:#4dd4a0;font-size:clamp(52px,7vw,100px);" id="d-otd">—%</div>
+        <div class="kl" style="font-size:12px;margin-bottom:12px;">On-time delivery rate</div>
+        <div class="kd up" id="d-otd-trend" style="font-size:14px;margin-bottom:20px;">—</div>
+        <div style="display:flex;gap:40px;margin-top:8px;">
+          <div>
+            <div style="font-size:clamp(24px,3vw,40px);font-weight:800;color:#f0efec;font-variant-numeric:tabular-nums;" id="d-otd-shipped">—</div>
+            <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-top:4px;">Total Jobs Shipped</div>
+          </div>
+          <div>
+            <div style="font-size:clamp(24px,3vw,40px);font-weight:800;color:#4dd4a0;font-variant-numeric:tabular-nums;" id="d-otd-ontime">—</div>
+            <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-top:4px;">Jobs On Time</div>
+          </div>
+        </div>
+      </div>
+      <div class="card grow" style="display:flex;flex-direction:column;justify-content:center;padding:32px 36px;">
+        <div class="ch" style="font-size:12px;">Previous month OTD</div>
+        <div class="kv" style="color:#6aabf7;font-size:clamp(52px,7vw,100px);" id="d-prev-otd">—%</div>
+        <div class="kl" style="font-size:12px;margin-bottom:12px;">On-time delivery rate</div>
+        <div class="kd" id="d-prev-label" style="font-size:14px;margin-bottom:20px;">—</div>
+        <div style="display:flex;gap:40px;margin-top:8px;">
+          <div>
+            <div style="font-size:clamp(24px,3vw,40px);font-weight:800;color:#f0efec;font-variant-numeric:tabular-nums;" id="d-prev-shipped">—</div>
+            <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-top:4px;">Total Jobs Shipped</div>
+          </div>
+          <div>
+            <div style="font-size:clamp(24px,3vw,40px);font-weight:800;color:#6aabf7;font-variant-numeric:tabular-nums;" id="d-prev-ontime">—</div>
+            <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-top:4px;">Jobs On Time</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="ticker"><span class="ticker-inner" id="tk-2">Total Tooling Concepts — Shop Floor Dashboard</span></div>
+</div>
+
+<!-- SLIDE 4: JOBS TO ADVANCE -->
+<div class="slide" id="slide-3">
+  <div class="nav">
+    <div style="display:flex;align-items:center;">
+      <div class="logo-box"><img id="logo-img-3" src="" alt="TTC"></div>
+      <span class="nav-brand">Total Tooling Concepts</span>
+      <span class="nav-subtitle">Shop Floor Dashboard</span>
+    </div>
+    <div class="nav-center" id="dots-3"></div>
+    <div class="nav-right">
+      <button class="btn" onclick="openModal('msetup')" style="font-size:10px;">⚙ Setup</button>
+      <span class="nav-label">Shop Floor</span>
+      <div><div class="clock" id="clk3">--:--</div><div class="date-s" id="ds3">--</div></div>
+    </div>
+  </div>
+  <div class="autoplay-bar"><div class="autoplay-fill" id="ap-3"></div></div>
+  <div class="content">
+    <div class="cbar">
+      <div style="display:flex;align-items:center;"><div class="cdot"></div>Shop Floor — 2 of 2</div>
+      <div class="brow">
+        <button class="add-row" onclick="addAdvRow()">+ add row</button>
+        <button class="btn" onclick="pushToSheet()">☁ Save to cloud</button>
+        <button class="btn" onclick="togglePause()">⏸ Pause</button>
+      </div>
+    </div>
+    <div class="card grow" style="display:flex;flex-direction:column;">
+      <div class="ch">Jobs to advance into current month — target finish dates</div>
+      <p style="font-size:11px;color:var(--muted);margin-bottom:10px;flex-shrink:0;">Jobs with future due dates being pulled forward.</p>
+      <div class="etable-wrap">
+        <table class="etable" id="adv-tbl">
+          <thead><tr>
+            <th style="width:22px;"></th>
+            <th>Job No.</th><th>Customer</th><th>Customer Due Date</th>
+            <th>Target Finish Date</th><th>Revenue</th><th>Tool Leader</th>
+          </tr></thead>
+          <tbody id="adv-body">
+            <tr>
+              <td><button class="del-btn" onclick="delRow(this)">×</button></td>
+              <td><input type="text" placeholder="Job No."></td>
+              <td><input type="text" placeholder="Customer"></td>
+              <td><input type="text" placeholder="e.g. Oct 15"></td>
+              <td><input type="text" placeholder="Sep 30"></td>
+              <td><input type="text" placeholder="$0"></td>
+              <td><select><option value="">— select —</option>
+                <option>Scott Higbee</option><option>John Grewe</option><option>Quinton Baranowski</option>
+                <option>Dave Wieten</option><option>Mike Modzeleski</option><option>Ken Beutler</option>
+                <option>Patrick Dunnenback</option><option>Jordan Meadows</option><option>Greg Markley</option>
+                <option>Todd Gurnsey</option><option>Kevin Nowicki</option><option>Dave Richmond</option>
+                <option>TBD</option><option>CNC</option><option>LAB</option>
+              </select></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="ticker"><span class="ticker-inner" id="tk-3">Total Tooling Concepts — Shop Floor Dashboard</span></div>
+</div>
+
+<!-- SLIDE 5: MILESTONES -->
+<div class="slide" id="slide-4">
+  <div class="nav">
+    <div style="display:flex;align-items:center;">
+      <div class="logo-box"><img id="logo-img-4" src="" alt="TTC"></div>
+      <span class="nav-brand">Total Tooling Concepts</span>
+      <span class="nav-subtitle">Shop Floor Dashboard</span>
+    </div>
+    <div class="nav-center" id="dots-4"></div>
+    <div class="nav-right">
+      <button class="btn" onclick="openModal('msetup')" style="font-size:10px;">⚙ Setup</button>
+      <span class="nav-label">People</span>
+      <div><div class="clock" id="clk4">--:--</div><div class="date-s" id="ds4">--</div></div>
+    </div>
+  </div>
+  <div class="autoplay-bar"><div class="autoplay-fill" id="ap-4"></div></div>
+  <div class="content">
+    <div class="cbar">
+      <div style="display:flex;align-items:center;"><div class="cdot"></div>Milestones &amp; Recognitions</div>
+      <div class="brow">
+        <button class="btn btng" onclick="openRecModal()">Manage</button>
+        <button class="btn" onclick="pushToSheet()">☁ Save to cloud</button>
+        <button class="btn" onclick="togglePause()">⏸ Pause</button>
+      </div>
+    </div>
+    <div id="rec-grid" style="display:flex;gap:16px;flex:1;min-height:0;"></div>
+  </div>
+  <div class="ticker"><span class="ticker-inner" id="tk-4">Total Tooling Concepts — Shop Floor Dashboard</span></div>
+</div>
+
+<div id="pause-ind">⏸ Paused — click anywhere to resume</div>
+<div id="flash"></div>
+
+<!-- MODALS -->
+<div class="mover" id="msales">
+  <div class="modal">
+    <div class="mt">Edit Sales &amp; Backlog KPIs</div>
+    <div class="mgrid">
+      <div class="mf"><label class="ml">Monthly actual sales</label><input class="mi" id="m-ma"></div>
+      <div class="mf"><label class="ml">Monthly budget</label><input class="mi" id="m-mb"></div>
+      <div class="mf"><label class="ml">Current backlog value</label><input class="mi" id="m-bl"></div>
+      <div class="mf"><label class="ml">YTD revenue</label><input class="mi" id="m-ytd"></div>
+      <div class="mf"><label class="ml">YTD trend note</label><input class="mi" id="m-ytdvs" value="↓ 8% YoY"></div>
+      <div class="mf"><label class="ml">Quote win rate</label><input class="mi" id="m-wr"></div>
+      <div class="mf"><label class="ml">Quotes sent</label><input class="mi" id="m-qs"></div>
+      <div class="mf"><label class="ml">Backlog % of $2M target</label><input class="mi" id="m-blpct" type="number" min="0" max="150"></div>
+    </div>
+    <div class="mfoot">
+      <button class="btn" onclick="closeModal('msales')">Cancel</button>
+      <button class="btn btng" onclick="saveSales()">Save</button>
+    </div>
+  </div>
+</div>
+
+<div class="mover" id="mrevenue">
+  <div class="modal">
+    <div class="mt">Edit 2026 Monthly Revenue ($K)</div>
+    <div class="mgrid">
+      <div class="mf"><label class="ml">January</label><input class="mi" id="rv-1" type="number" value="0"></div>
+      <div class="mf"><label class="ml">February</label><input class="mi" id="rv-2" type="number" value="0"></div>
+      <div class="mf"><label class="ml">March</label><input class="mi" id="rv-3" type="number" value="0"></div>
+      <div class="mf"><label class="ml">April</label><input class="mi" id="rv-4" type="number" value="0"></div>
+      <div class="mf"><label class="ml">May</label><input class="mi" id="rv-5" type="number" value="0"></div>
+      <div class="mf"><label class="ml">June</label><input class="mi" id="rv-6" type="number" value="0"></div>
+      <div class="mf"><label class="ml">July</label><input class="mi" id="rv-7" type="number" value="0"></div>
+      <div class="mf"><label class="ml">August</label><input class="mi" id="rv-8" type="number" value="0"></div>
+      <div class="mf"><label class="ml">September</label><input class="mi" id="rv-9" type="number" value="0"></div>
+      <div class="mf"><label class="ml">October</label><input class="mi" id="rv-10" type="number" value="0"></div>
+      <div class="mf"><label class="ml">November</label><input class="mi" id="rv-11" type="number" value="0"></div>
+      <div class="mf"><label class="ml">December</label><input class="mi" id="rv-12" type="number" value="0"></div>
+    </div>
+    <div class="mfoot">
+      <button class="btn" onclick="closeModal('mrevenue')">Cancel</button>
+      <button class="btn btng" onclick="saveRevenue()">Update chart</button>
+    </div>
+  </div>
+</div>
+
+<div class="mover" id="mshop">
+  <div class="modal">
+    <div class="mt">Edit Shop Floor Stats</div>
+    <div style="font-size:11px;color:var(--muted);margin-bottom:12px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;">Current Month OTD</div>
+    <div class="mgrid">
+      <div class="mf"><label class="ml">OTD % (current month)</label><input class="mi" id="m-otd" placeholder="e.g. 94%"></div>
+      <div class="mf"><label class="ml">Trend note</label><input class="mi" id="m-otdt" placeholder="e.g. ↑ from last month"></div>
+      <div class="mf"><label class="ml">Total jobs shipped</label><input class="mi" id="m-otd-shipped" placeholder="0"></div>
+      <div class="mf"><label class="ml">Jobs on time</label><input class="mi" id="m-otd-ontime" placeholder="0"></div>
+    </div>
+    <div style="font-size:11px;color:var(--muted);margin-bottom:12px;margin-top:6px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;">Previous Month OTD</div>
+    <div class="mgrid">
+      <div class="mf"><label class="ml">OTD % (previous month)</label><input class="mi" id="m-prev-otd" placeholder="e.g. 91%"></div>
+      <div class="mf"><label class="ml">Month name</label><input class="mi" id="m-prev-label" placeholder="e.g. August 2026"></div>
+      <div class="mf"><label class="ml">Total jobs shipped</label><input class="mi" id="m-prev-shipped" placeholder="0"></div>
+      <div class="mf"><label class="ml">Jobs on time</label><input class="mi" id="m-prev-ontime" placeholder="0"></div>
+    </div>
+    <div class="mfoot">
+      <button class="btn" onclick="closeModal('mshop')">Cancel</button>
+      <button class="btn btng" onclick="saveShop()">Save</button>
+    </div>
+  </div>
+</div>
+
+<div class="mover" id="mrec">
+  <div class="modal" style="width:600px;">
+    <div class="mt">Manage Milestones &amp; Recognitions</div>
+    <div id="rec-edit-list"></div>
+    <button class="add-row" style="margin-top:10px;" onclick="addRecCard()">+ add recognition</button>
+    <div class="mfoot">
+      <button class="btn" onclick="closeModal('mrec')">Cancel</button>
+      <button class="btn btng" onclick="saveRec()">Save &amp; display</button>
+    </div>
+  </div>
+</div>
+
+<!-- SETUP MODAL -->
+<div class="mover" id="msetup">
+  <div class="modal" style="width:520px;">
+    <div class="mt">☁ Cloud Setup</div>
+    <p style="font-size:13px;color:var(--muted);margin-bottom:20px;line-height:1.7;">
+      Paste your Google Apps Script URL below. This connects the dashboard to your Google Sheet so data syncs between machines automatically.
+    </p>
+    <div class="mf">
+      <label class="ml">Google Apps Script Web App URL</label>
+      <input class="mi" id="cfg-script-url" placeholder="https://script.google.com/macros/s/...">
+    </div>
+    <details style="margin-top:4px;border:1px solid #2a2a2a;border-radius:6px;padding:10px 14px;margin-bottom:8px;">
+      <summary style="font-size:11px;color:var(--muted);cursor:pointer;font-weight:600;letter-spacing:.06em;">How to get your Script URL (one time setup)</summary>
+      <div style="margin-top:12px;font-size:12px;color:#aaa;line-height:1.8;">
+        <b style="color:#f0efec;">1.</b> Go to <a href="https://sheets.google.com" target="_blank" style="color:#4dd4a0;">sheets.google.com</a> and create a new blank spreadsheet. Name it <b>TTC Dashboard</b>.<br>
+        <b style="color:#f0efec;">2.</b> Click <b>Extensions → Apps Script</b><br>
+        <b style="color:#f0efec;">3.</b> Delete any existing code and paste the script provided by Claude.<br>
+        <b style="color:#f0efec;">4.</b> Click <b>Deploy → New deployment</b><br>
+        <b style="color:#f0efec;">5.</b> Type: <b>Web app</b> → Execute as: <b>Me</b> → Who has access: <b>Anyone</b><br>
+        <b style="color:#f0efec;">6.</b> Click <b>Deploy</b>, copy the URL and paste it above.
+      </div>
+    </details>
+    <div class="mfoot">
+      <button class="btn" onclick="closeModal('msetup')">Cancel</button>
+      <button class="btn btng" onclick="saveSetup()">Save &amp; connect</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ── LOGO (embedded) ── */
+const LOGO_URL = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAeAB4AAD/2wBDAAMCAgMCAgMDAwMEAwMEBQgFBQQEBQoHBwYIDAoMCwsKCwsNDhIQDQ4RDgsLEBYQERMUFRUVDA8XGBYUGBIUFRT/2wBDAQMEBAUEBQkFBQkUDQsNFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBT/wAARCABkAJYDASIAAhEBAxEB/8QAHAAAAgMBAQEBAAAAAAAAAAAAAAYFBwgEAwIB/8QAOhAAAQMDAgUBBgMHBAMAAAAAAQIDBAUREiExBhNBUWEHFCIycYGRFiMkQlJiscHR8BUzQ2Ny4f/EABoBAAMBAQEBAAAAAAAAAAAAAAIDBAABBQb/xAAkEQACAgICAgIDAQAAAAAAAAABAgADERIhMUEEE1EiYXH/2gAMAwEAAhEDEQA/AJ+EIQAhCEAIQhACEIQAhCEAIQhACEIQAhCEAIQhACEIQAhCEAIQhACEIQAhCEAIQhAC6ON1DWvUFpodPW6suFWQGU8Rl2O5xwAO5J4A7ladcg8UdXBWaivkzSSIZXRMPZjTtH4DPzQFFUpLDdjsqlSVsT1IG7qWoqJaqolklqJHF8kjzlznE5JJ7kk5UrWoVlLT0sUNNEyGCJoZHGwYa1oGAAOwACxshaTRVlRQ1tPV0sr4aiCRskcrDhzHAghwPYggH8l3Ust1ZVdRp0kkYUFzLqU0bHFsjQ4do4I/BZlkjKwQhCQEIQgBCEIAQhCAEIQgBCEIAQhCAEIQgBCEIAQhCANLXa9N6YsDam8XqnsVMxrWvqZ5AwHJOACfieB3K6tTW22XqigrLXXQV1PIMtlhcHN9Rx6+oPVNr16jQ2i2Xm7VFNNPaKMVIjpN0bZMNOGlzCHAEnPdpIHcjOFaeLmu6XS3Rmm9OUNJVaptEAnq31zXGKlJOGsLWloc7OT1I6YAJOcIlC2cFNMNAaF1o2hnipbvKymrDT4ZE8uHJY3Bt3ZDhkEkdxgqR6e1vXx0cdHqq3R3uGMBrZpGATNHYOwMO9M59lV/SfR2z6f1xa9RQ1NYam3VkdXHHIQ6MOa4OG5uMnkDOR34VnPRJxSNXKLiT0R8oa7aTUGm9MVFFpTUFVp64ubKGVkR5YHNOzJwcFp6gEEHv2xyFoNKaOsuoNGWC+VlYKaupaSKOokE7Y2ysyWkua3cRkNaSMnv3VdPE6s1VpzSMUWhKqkp5brd6SnrpaqNsrKWESlpBBIALnBjQTxk5A4yqWv2udMy6s01FojUF4FXNUCmqKTz3RPibGW4Dcsz5bcEEEZ4HPVRi2o5KjfTY9sMQvWqL0O2aR1HFfaFrqpkbKqNxjnhY8PGQM5a7bkYPz7YIyCiU0WtNN1ltulXf9T1kNZT1Uc8rGvz5bm7mjDcAYzjIB4z8lSXhz4hRaS1bBQ3+e4VlhqYZJA9sblFK5nzBtaAG5xyAMdu4V3g4rdJTL3LbNf1vbaePUthvdVQVFbaoZaOtmGHMBBa9mOMjIGMjI9T1TrQ9TJVaOsU0wPmvoIHPz13FgOfxU/RcQtGatqbbqjU1DWV12fBHHVxQMkjhkLMEkhpIx3IO7BJyc8KS6do4LZpq0UNMAIKamiiYB22hoA/ALcY1CZJFfJGQhCpBCEIAQhCAEIQgBCEIAQhCAEIQgBCEIAQhCALz4V6pfpvW9JvkxT1ZFPPk/LkY3e7G/V3/VMfE+9mz6HulQ04kkZ5Mf8A5HANPyJBKpjw11U7SOs6apkdspp/+HKSS3Du2T7LsH9lJfFFWivp6LTjHZZADUygH5jO1v4En8FTi/y0YvLi2R8z8mH5hpyVkQhCWEIQgBCEIAQhCAEIQgBCEIAQhCAEIQgBCEIAQhCAEIQgBCEIAQhCAEIQgBCEIAQhCAEIQgBCEIAQhCAEIQgBCEIAQhCAEIQgBCEIAQhCAEIQgBCEIAQhCAEIQgBCEIAQhCAEIQgBCEIAQhCAEIQgBCEIAQhCAEIQgBCEIAQhCAf/Z';
+document.querySelectorAll('[id^="logo-img"]').forEach(img => img.src = LOGO_URL);
+
+/* ── STATE ── */
+const SLIDES = 5;
+const SLIDE_MS = 12000;
+let current = 0, paused = false, timer = null;
+
+const state = {
+  sales: {ma:'',mb:'',bl:'',ytd:'',ytdvs:'↓ 8% YoY',wr:'',qs:'',blpct:0},
+  shop:  {otd:'',otdt:'',otdShipped:'',otdOntime:'',prevOtd:'',prevLabel:'',prevShipped:'',prevOntime:''},
+  revenue: [0,0,0,0,0,0,0,0,0,0,0,0],
+  recognitions: [
+    {icon:'🏆', name:'Mike R.',  sub:'5-yr milestone'},
+    {icon:'⭐', name:'Dave K.',  sub:'CMM lead — Q4'},
+    {icon:'🔧', name:'CE team',  sub:'Welcome aboard'}
+  ],
+  scriptUrl: ''
+};
+
+/* ── CLOCK ── */
+function tick() {
+  const n=new Date(), p=v=>String(v).padStart(2,'0');
+  const t=p(n.getHours())+':'+p(n.getMinutes());
+  const days=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  const months=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const d=days[n.getDay()]+', '+months[n.getMonth()]+' '+n.getDate()+' '+n.getFullYear();
+  for(let i=0;i<SLIDES;i++){
+    const ce=document.getElementById('clk'+i), de=document.getElementById('ds'+i);
+    if(ce) ce.textContent=t; if(de) de.textContent=d;
+  }
+}
+tick(); setInterval(tick,30000);
+
+/* ── DOTS ── */
+function buildDots() {
+  for(let d=0;d<SLIDES;d++){
+    const w=document.getElementById('dots-'+d); if(!w) continue;
+    w.innerHTML='';
+    for(let i=0;i<SLIDES;i++){
+      const dot=document.createElement('div');
+      dot.className='slide-dot'+(i===d?' active':'');
+      dot.onclick=()=>goTo(i);
+      w.appendChild(dot);
+    }
+  }
+}
+buildDots();
+
+/* ── SLIDES ── */
+function goTo(idx) {
+  clearTimeout(timer); stopProgress();
+  document.querySelectorAll('.slide').forEach(s=>s.classList.remove('active'));
+  document.getElementById('slide-'+idx).classList.add('active');
+  current=idx; buildDots(); updateTickers();
+  if(!paused) startProgress();
+}
+function next(){ goTo((current+1)%SLIDES); }
+function startProgress() {
+  stopProgress();
+  const fill=document.getElementById('ap-'+current); if(!fill) return;
+  fill.style.transition='none'; fill.style.width='0%';
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{
+    fill.style.transition=`width ${SLIDE_MS}ms linear`; fill.style.width='100%';
+  }));
+  timer=setTimeout(next,SLIDE_MS);
+}
+function stopProgress() {
+  clearTimeout(timer);
+  for(let i=0;i<SLIDES;i++){const f=document.getElementById('ap-'+i); if(f){f.style.transition='none';f.style.width='0%';}}
+}
+function togglePause() {
+  paused=!paused;
+  document.getElementById('pause-ind').classList.toggle('show',paused);
+  document.querySelectorAll('[onclick="togglePause()"]').forEach(b=>b.textContent=paused?'▶ Resume':'⏸ Pause');
+  paused?stopProgress():startProgress();
+}
+document.addEventListener('click',e=>{
+  if(paused&&!e.target.closest('.mover')&&!e.target.closest('.btn')&&!e.target.closest('.add-row')&&!e.target.closest('.del-btn')&&e.target.tagName!=='INPUT'&&e.target.tagName!=='SELECT') togglePause();
+});
+document.addEventListener('keydown',e=>{
+  if(document.querySelector('.mover.open')) return;
+  if(e.key==='ArrowRight'||e.key===' ') next();
+  if(e.key==='ArrowLeft') goTo((current-1+SLIDES)%SLIDES);
+  if(e.key==='p'||e.key==='P') togglePause();
+});
+
+/* ── MODAL ── */
+function openModal(id){if(!paused)togglePause(); document.getElementById(id).classList.add('open');}
+function closeModal(id){document.getElementById(id).classList.remove('open');}
+document.querySelectorAll('.mover').forEach(o=>o.addEventListener('click',function(e){if(e.target===this)this.classList.remove('open');}));
+
+/* ── FLASH ── */
+function flash(msg,color){
+  const el=document.getElementById('flash');
+  el.textContent=msg; el.style.background=color||'#2d7a2d'; el.classList.add('show');
+  clearTimeout(el._t); el._t=setTimeout(()=>el.classList.remove('show'),2500);
+}
+
+/* ── HTML ESCAPE ── */
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');}
+
+/* ── REVENUE CHART ── */
+const BUDGET=740; let revChart;
+function buildRevChart(){
+  const ctx=document.getElementById('revChart').getContext('2d');
+  revChart=new Chart(ctx,{
+    type:'bar',
+    data:{
+      labels:['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],
+      datasets:[
+        {label:'Actual',data:state.revenue.map(v=>v||null),backgroundColor:'#2d7a2d',borderRadius:4},
+        {label:'Budget',data:Array(12).fill(BUDGET),type:'line',borderColor:'#6aabf7',borderWidth:2,borderDash:[5,4],pointRadius:0,fill:false}
+      ]
+    },
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+      scales:{x:{ticks:{color:'#666',font:{size:11}},grid:{color:'rgba(255,255,255,.04)'}},
+              y:{ticks:{color:'#666',font:{size:11},callback:v=>'$'+v+'K'},grid:{color:'rgba(255,255,255,.04)'}}}}
+  });
+}
+function openRevenueModal(){
+  for(let i=1;i<=12;i++) document.getElementById('rv-'+i).value=state.revenue[i-1]||'';
+  openModal('mrevenue');
+}
+function saveRevenue(){
+  for(let i=1;i<=12;i++) state.revenue[i-1]=parseFloat(document.getElementById('rv-'+i).value)||0;
+  revChart.data.datasets[0].data=state.revenue.map(v=>v||null); revChart.update();
+  closeModal('mrevenue'); autoSave();
+}
+
+/* ── RENDER FUNCTIONS ── */
+function renderSales(){
+  const s=state.sales;
+  document.getElementById('d-ma').textContent=s.ma||'$—';
+  document.getElementById('d-mb').textContent=s.mb||'$—';
+  document.getElementById('d-bl').textContent=s.bl||'$—';
+  document.getElementById('d-bl-big').textContent=s.bl||'$—';
+  document.getElementById('d-ytd').textContent=s.ytd||'$—';
+  const vs=document.getElementById('d-ytdvs'); vs.textContent=s.ytdvs||'—';
+  vs.className='kd '+(s.ytdvs&&s.ytdvs.includes('↑')?'up':'dn');
+  document.getElementById('d-wr').textContent=s.wr?s.wr+'%':'—%';
+  document.getElementById('d-qs').textContent=s.qs||'—';
+  const pct=Math.min(s.blpct||0,150);
+  document.getElementById('d-blpct').textContent=pct+'%';
+  document.getElementById('d-blpct-badge').textContent=pct+'%';
+  const fill=document.getElementById('bl-fill');
+  fill.style.width=Math.min(pct,100)+'%';
+  fill.style.background=pct>=90?'var(--good)':pct>=70?'var(--warn)':'var(--danger)';
+}
+function renderShop(){
+  const s=state.shop;
+  document.getElementById('d-otd').textContent=s.otd||'—%';
+  document.getElementById('d-otd-trend').textContent=s.otdt||'—';
+  document.getElementById('d-otd-shipped').textContent=s.otdShipped||'—';
+  document.getElementById('d-otd-ontime').textContent=s.otdOntime||'—';
+  document.getElementById('d-prev-otd').textContent=s.prevOtd||'—%';
+  document.getElementById('d-prev-label').textContent=s.prevLabel||'—';
+  document.getElementById('d-prev-shipped').textContent=s.prevShipped||'—';
+  document.getElementById('d-prev-ontime').textContent=s.prevOntime||'—';
+}
+function renderRecCards(){
+  const g=document.getElementById('rec-grid'); g.innerHTML='';
+  state.recognitions.forEach(r=>{
+    const d=document.createElement('div'); d.className='rec';
+    d.innerHTML=`<div class="rec-icon">${r.icon}</div><div class="rec-name">${r.name}</div><div class="rec-sub">${r.sub}</div>`;
+    g.appendChild(d);
+  });
+  const add=document.createElement('div'); add.className='rec-add';
+  add.onclick=()=>openRecModal();
+  add.innerHTML='<div style="font-size:28px;color:#333;margin-bottom:8px;">+</div><div style="font-size:12px;color:#555;">Add recognition</div>';
+  g.appendChild(add);
+}
+function updateTickers(){
+  const s=state.sales, sh=state.shop, parts=[];
+  if(s.ytd)   parts.push('YTD Revenue: '+s.ytd);
+  if(s.bl)    parts.push('Backlog: '+s.bl+' (target $2.0M)');
+  if(s.ma)    parts.push('Month Actual: '+s.ma+' / Budget: '+(s.mb||'—'));
+  if(s.wr)    parts.push('Quote Win Rate: '+s.wr+'%');
+  if(sh.otd)  parts.push('Current Month OTD: '+sh.otd);
+  if(sh.prevOtd) parts.push('Previous Month OTD: '+sh.prevOtd);
+  if(!parts.length) parts.push('Total Tooling Concepts — Shop Floor Dashboard');
+  const txt=parts.map(p=>'✦  '+p).join('     ')+'  ';
+  for(let i=0;i<SLIDES;i++){const el=document.getElementById('tk-'+i); if(el) el.textContent=txt;}
+}
+
+/* ── MODAL SAVES ── */
+function saveSales(){
+  const s=state.sales;
+  s.ma=document.getElementById('m-ma').value||s.ma;
+  s.mb=document.getElementById('m-mb').value||s.mb;
+  s.bl=document.getElementById('m-bl').value||s.bl;
+  s.ytd=document.getElementById('m-ytd').value||s.ytd;
+  s.ytdvs=document.getElementById('m-ytdvs').value||s.ytdvs;
+  s.wr=document.getElementById('m-wr').value||s.wr;
+  s.qs=document.getElementById('m-qs').value||s.qs;
+  s.blpct=parseFloat(document.getElementById('m-blpct').value)||s.blpct;
+  renderSales(); updateTickers(); closeModal('msales'); autoSave();
+}
+function saveShop(){
+  const s=state.shop;
+  s.otd=document.getElementById('m-otd').value;
+  s.otdt=document.getElementById('m-otdt').value;
+  s.otdShipped=document.getElementById('m-otd-shipped').value;
+  s.otdOntime=document.getElementById('m-otd-ontime').value;
+  s.prevOtd=document.getElementById('m-prev-otd').value;
+  s.prevLabel=document.getElementById('m-prev-label').value;
+  s.prevShipped=document.getElementById('m-prev-shipped').value;
+  s.prevOntime=document.getElementById('m-prev-ontime').value;
+  renderShop(); updateTickers(); closeModal('mshop'); autoSave();
+}
+
+/* ── RECOGNITIONS ── */
+function buildRecEditor(){
+  const el=document.getElementById('rec-edit-list'); el.innerHTML='';
+  state.recognitions.forEach((r,i)=>{
+    const row=document.createElement('div');
+    row.style.cssText='display:grid;grid-template-columns:50px 1fr 2fr auto;gap:8px;align-items:center;margin-bottom:10px;';
+    row.innerHTML=`<input class="mi" id="ri-${i}" value="${r.icon}" style="text-align:center;font-size:20px;">
+      <input class="mi" id="rn-${i}" value="${r.name}" placeholder="Name">
+      <input class="mi" id="rs-${i}" value="${r.sub}" placeholder="Achievement">
+      <button class="del-btn" onclick="removeRec(${i})" style="font-size:18px;">×</button>`;
+    el.appendChild(row);
+  });
+}
+function removeRec(i){state.recognitions.splice(i,1);buildRecEditor();}
+function addRecCard(){state.recognitions.push({icon:'🌟',name:'',sub:''});buildRecEditor();}
+function saveRec(){
+  state.recognitions=state.recognitions.map((_,i)=>({
+    icon:document.getElementById('ri-'+i).value||'🌟',
+    name:document.getElementById('rn-'+i).value,
+    sub:document.getElementById('rs-'+i).value
+  })).filter(r=>r.name);
+  renderRecCards(); closeModal('mrec'); autoSave();
+}
+function openRecModal(){buildRecEditor();openModal('mrec');}
+
+/* ── TABLE HELPERS ── */
+function delRow(btn){btn.closest('tr').remove(); autoSave();}
+function addPipelineRow(){
+  const tr=document.createElement('tr');
+  tr.innerHTML=`<td><button class="del-btn" onclick="delRow(this)">×</button></td>
+    <td><input type="text" placeholder="Salesperson"></td><td><input type="text" placeholder="$0"></td>
+    <td><input type="text" placeholder="$0"></td><td><input type="text" placeholder="0"></td>
+    <td><input type="text" placeholder="0"></td><td><input type="text" placeholder="0%"></td>`;
+  document.getElementById('pipeline-body').appendChild(tr); autoSave();
+}
+function addAdvRow(){
+  const tr=document.createElement('tr');
+  tr.innerHTML=`<td><button class="del-btn" onclick="delRow(this)">×</button></td>
+    <td><input type="text" placeholder="Job No."></td><td><input type="text" placeholder="Customer"></td>
+    <td><input type="text" placeholder="e.g. Oct 15"></td><td><input type="text" placeholder="Sep 30"></td>
+    <td><input type="text" placeholder="$0"></td>
+    <td><select><option value="">— select —</option>
+      <option>Scott Higbee</option><option>John Grewe</option><option>Quinton Baranowski</option>
+      <option>Dave Wieten</option><option>Mike Modzeleski</option><option>Ken Beutler</option>
+      <option>Patrick Dunnenback</option><option>Jordan Meadows</option><option>Greg Markley</option>
+      <option>Todd Gurnsey</option><option>Kevin Nowicki</option><option>Dave Richmond</option>
+      <option>TBD</option><option>CNC</option><option>LAB</option>
+    </select></td>`;
+  document.getElementById('adv-body').appendChild(tr); autoSave();
+}
+
+/* ── SERIALIZE TABLES ── */
+function serializePipeline(){
+  return [...document.querySelectorAll('#pipeline-body tr')].map(tr=>{
+    const i=tr.querySelectorAll('input[type=text]');
+    return {sp:i[0]?.value||'',pipeline:i[1]?.value||'',ytd:i[2]?.value||'',quotes:i[3]?.value||'',won:i[4]?.value||'',winpct:i[5]?.value||''};
+  });
+}
+function serializeAdv(){
+  return [...document.querySelectorAll('#adv-body tr')].map(tr=>{
+    const i=tr.querySelectorAll('input[type=text]'); const s=tr.querySelector('select');
+    return {job:i[0]?.value||'',cust:i[1]?.value||'',custDue:i[2]?.value||'',targetDue:i[3]?.value||'',rev:i[4]?.value||'',leader:s?.value||''};
+  });
+}
+function buildPayload(){
+  return {sales:state.sales,shop:state.shop,revenue:state.revenue,
+          recognitions:state.recognitions,pipeline:serializePipeline(),adv:serializeAdv()};
+}
+
+/* ── APPLY PAYLOAD ── */
+function applyPayload(d){
+  if(!d) return;
+  if(d.sales) Object.assign(state.sales,d.sales);
+  if(d.shop)  Object.assign(state.shop,d.shop);
+  if(d.revenue?.length===12) state.revenue=d.revenue;
+  if(d.recognitions?.length) state.recognitions=d.recognitions;
+  if(d.pipeline?.length){
+    const tb=document.getElementById('pipeline-body'); tb.innerHTML='';
+    d.pipeline.forEach(r=>{
+      const tr=document.createElement('tr');
+      tr.innerHTML=`<td><button class="del-btn" onclick="delRow(this)">×</button></td>
+        <td><input type="text" value="${esc(r.sp)}"></td><td><input type="text" value="${esc(r.pipeline)}"></td>
+        <td><input type="text" value="${esc(r.ytd)}"></td><td><input type="text" value="${esc(r.quotes||'')}"></td>
+        <td><input type="text" value="${esc(r.won||'')}"></td><td><input type="text" value="${esc(r.winpct||'')}"></td>`;
+      tb.appendChild(tr);
+    });
+  }
+  if(d.adv?.length){
+    const tb=document.getElementById('adv-body'); tb.innerHTML='';
+    const ldrs=['','Scott Higbee','John Grewe','Quinton Baranowski','Dave Wieten','Mike Modzeleski','Ken Beutler','Patrick Dunnenback','Jordan Meadows','Greg Markley','Todd Gurnsey','Kevin Nowicki','Dave Richmond','TBD','CNC','LAB'];
+    d.adv.forEach(r=>{
+      const tr=document.createElement('tr');
+      const opts=ldrs.map(l=>`<option value="${l}"${r.leader===l?' selected':''}>${l||'— select —'}</option>`).join('');
+      tr.innerHTML=`<td><button class="del-btn" onclick="delRow(this)">×</button></td>
+        <td><input type="text" value="${esc(r.job)}"></td><td><input type="text" value="${esc(r.cust)}"></td>
+        <td><input type="text" value="${esc(r.custDue)}"></td><td><input type="text" value="${esc(r.targetDue)}"></td>
+        <td><input type="text" value="${esc(r.rev)}"></td><td><select>${opts}</select></td>`;
+      tb.appendChild(tr);
+    });
+  }
+  renderSales(); renderShop(); renderRecCards(); updateTickers();
+  if(revChart){revChart.data.datasets[0].data=state.revenue.map(v=>v||null);revChart.update();}
+}
+
+/* ══════════════════════════════════════
+   GOOGLE APPS SCRIPT SYNC
+   Works from any machine, no CORS issues
+   ══════════════════════════════════════ */
+const LS_KEY='ttc_data_v3', LS_URL='ttc_script_url';
+
+function saveSetup(){
+  const url=document.getElementById('cfg-script-url').value.trim();
+  if(!url){alert('Please enter your Script URL.');return;}
+  state.scriptUrl=url;
+  localStorage.setItem(LS_URL,url);
+  closeModal('msetup');
+  flash('✓ Script URL saved — pulling data…');
+  pullFromSheet();
+}
+
+/* Push data TO the Google Sheet */
+async function pushToSheet(){
+  saveLocal();
+  if(!state.scriptUrl){flash('⚠ No script URL — data saved locally only','#b85a00');return;}
+  try{
+    const payload=buildPayload();
+    /* Use no-cors mode — Apps Script handles it */
+    await fetch(state.scriptUrl+'?action=write&data='+encodeURIComponent(JSON.stringify(payload)),{method:'GET',mode:'no-cors'});
+    flash('☁ Saved to cloud');
+    setBadge('ok');
+  }catch(e){
+    flash('⚠ Cloud save failed — saved locally','#b85a00');
+    setBadge('err');
+  }
+}
+
+/* Pull data FROM the Google Sheet */
+async function pullFromSheet(){
+  if(!state.scriptUrl) return;
+  try{
+    const r=await fetch(state.scriptUrl+'?action=read',{method:'GET'});
+    if(!r.ok) throw new Error(r.status);
+    const d=await r.json();
+    if(d&&d.sales){
+      applyPayload(d);
+      saveLocal();
+      flash('☁ Loaded from cloud');
+      setBadge('ok');
+    }
+  }catch(e){
+    flash('⚠ Could not reach cloud — showing local data','#b85a00');
+    setBadge('err');
+  }
+}
+
+/* Local save — always runs */
+function saveLocal(){
+  try{localStorage.setItem(LS_KEY,JSON.stringify(buildPayload()));}catch(e){}
+}
+
+/* Auto-save: local immediately, cloud after 2 sec debounce */
+let _at=null;
+function autoSave(){
+  saveLocal();
+  clearTimeout(_at); _at=setTimeout(pushToSheet,2000);
+}
+
+/* Wire table inputs */
+['pipeline-body','adv-body'].forEach(id=>{
+  const tb=document.getElementById(id); if(!tb) return;
+  tb.addEventListener('input',()=>autoSave());
+  tb.addEventListener('change',()=>autoSave());
+});
+
+/* Badge */
+function setBadge(s){
+  const el=document.getElementById('sync-badge'); if(!el) return;
+  if(s==='ok'){el.textContent='☁ Synced';el.className='sync-badge ok';}
+  else if(s==='err'){el.textContent='⚠ Local only';el.className='sync-badge err';}
+  else{el.textContent='⚙ Setup';el.className='sync-badge';}
+}
+
+/* Poll every 30s on display machine */
+setInterval(()=>pullFromSheet(),30000);
+
+/* ── INIT ── */
+buildRevChart();
+renderRecCards();
+updateTickers();
+startProgress();
+
+/* Load saved URL */
+const savedUrl=localStorage.getItem(LS_URL);
+if(savedUrl){state.scriptUrl=savedUrl;}
+
+/* Load local data first (instant) */
+try{
+  const raw=localStorage.getItem(LS_KEY);
+  if(raw) applyPayload(JSON.parse(raw));
+}catch(e){}
+
+/* Then pull from cloud */
+if(state.scriptUrl){
+  pullFromSheet();
+}
+</script>
+</body>
+</html>
 
